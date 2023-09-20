@@ -15,21 +15,40 @@ typedef enum tq_err
      * @note errno will be set if this error is returned.
      */
     TQ_ERR_OS = -2,
-
-    /** TQ_ERR_INVALID_ARG
-     * @brief An invalid argument was passed to a function
-     */
-    TQ_ERR_INVALID_ARG = -3,
 } tq_err;
 
+/** tq_task
+ * @brief A task is an object that can be executed by a runner.
+ * The fn and destroy functions must be implemented and set by the user.
+ *
+ * tq_task is designed to be used as a base class for other tasks.
+ * Thus, the first member of the user defined task should be a tq_task.
+ * For example:
+ * typedef struct my_task
+ * {
+ *      tq_task base;
+ *      int my_data;
+ * };
+ *
+ * The user then must implement the fn and destroy functions
+ * and set them when creating the task:
+ */
 typedef struct tq_task
 {
+    /** fn
+     * @brief The function to execute.
+     */
     void (*fn)(void *self);
+
+    /** destroy
+     * @brief The destructor for the task.
+     * Can be NULL if the task does not need to be destroyed.
+     */
     void (*destroy)(void *self);
+
+    /** This is used internally by the runner. */
     struct tq_task *next;
 } tq_task;
-
-tq_err tq_task_init(tq_task *task, void (*fn)(void *self), void (*destroy)(void *self));
 
 /** tq_runner
  * @brief A runner manages a queue of tasks and executes them.

@@ -40,7 +40,8 @@ static count_task *count_task_create(int *result)
     count_task *task;
     if ((task = calloc(1, sizeof(count_task))) == NULL)
         return NULL;
-    tq_task_init(&task->base, count_task_fn, count_task_destroy);
+    task->base.fn = count_task_fn;
+    task->base.destroy = count_task_destroy;
     task->result = result;
     return task;
 }

@@ -3,18 +3,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-/* tq_task init function */
-
-tq_err tq_task_init(tq_task *task, void (*fn)(void *self), void (*destroy)(void *self))
-{
-    if (!task || !fn)
-        return TQ_ERR_INVALID_ARG;
-    task->fn = fn;
-    task->destroy = destroy;
-    task->next = NULL;
-    return TQ_ERR_OK;
-}
-
 /* tq_mutex */
 
 typedef struct tq_mutex
@@ -423,7 +411,8 @@ void tq_strand_destroy(tq_strand *strand)
 
 static void tq_strand_task_init(tq_strand_task *task, tq_strand *strand)
 {
-    tq_task_init(&task->base, tq_strand_task_fn, NULL);
+    task->base.fn = tq_strand_task_fn;
+    task->base.destroy = NULL;
     task->strand = strand;
 }
 
