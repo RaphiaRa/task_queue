@@ -236,16 +236,16 @@ struct tq_runner
 tq_err tq_runner_create(tq_runner **runner)
 {
     tq_err err = TQ_ERR_OK;
-
     tq_thread_data_storage *storage = NULL;
+    tq_mutex *mtx = NULL;
+    tq_cond *cond = NULL;
+
     if ((err = tq_thread_data_storage_create(&storage)) != TQ_ERR_OK)
         goto cleanup;
 
-    tq_mutex *mtx = NULL;
     if ((err = tq_mutex_create(&mtx)) != TQ_ERR_OK)
         goto cleanup;
 
-    tq_cond *cond = NULL;
     if ((err = tq_cond_create(&cond)) != TQ_ERR_OK)
         goto cleanup;
 
@@ -272,17 +272,12 @@ cleanup:
     return err;
 }
 
-static void tq_runner_push_to_thread_queue(tq_runner *runner, tq_task *task, tq_thread_data *thread_data)
-{
-    tq_queue_push(&thread_data->queue, task);
-}
-
 void tq_runner_push(tq_runner *runner, tq_task *task)
 {
     tq_thread_data *thread_data = tq_thread_data_storage_get(runner->storage);
     if (thread_data)
     {
-        tq_runner_push_to_thread_queue(runner, task, thread_data);
+        tq_queue_push(&thread_data->queue, task);
     }
     else
     {
