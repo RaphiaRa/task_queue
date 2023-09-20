@@ -4,7 +4,7 @@
 
 Simple task queue implementation in C that allows to add tasks to a queue and execute them from multiple threads.
 
-Right now, only Linux and Mac OS is supported.
+Currently, only pthreads are supported.
 
 #### Example
 
