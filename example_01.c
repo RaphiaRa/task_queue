@@ -62,7 +62,7 @@ int main(int argc, char **argv)
         return -1;
 
     size_t start = 0;
-    size_t end = 100000000000;
+    size_t end = 10000000000;
     
     if (argc != 2)
     {
