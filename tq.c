@@ -323,7 +323,8 @@ tq_err tq_runner_run_one_impl(tq_runner *runner, tq_thread_data *thread_data)
             --runner->tasks;
             tq_mutex_unlock(runner->mtx);
             task->fn(task);
-            task->destroy(task);
+            if (task->destroy)
+                task->destroy(task);
             tq_runner_cleanup_thread_queue(runner, thread_data);
             return TQ_ERR_OK;
         }
@@ -370,4 +371,88 @@ void tq_runner_destroy(tq_runner *runner)
     CALL_ON_IF(runner->mtx, tq_mutex_destroy);
     CALL_ON_IF(runner->cond, tq_cond_destroy);
     free(runner);
+}
+
+/* tq_strand_task */
+
+typedef struct tq_strand_task
+{
+    tq_task base;
+    tq_strand *strand;
+} tq_strand_task;
+
+static void tq_strand_task_fn(void *self);
+
+static void tq_strand_task_init(tq_strand_task *task, tq_strand *strand);
+
+/* tq_strand */
+
+struct tq_strand
+{
+    tq_runner *runner;
+    tq_mutex *mtx;
+    tq_queue queue;
+    tq_strand_task task;
+};
+
+/* tq_strand functions */
+
+tq_err tq_strand_create(tq_strand **strand, tq_runner *runner)
+{
+    tq_err err = TQ_ERR_OK;
+
+    tq_mutex *mtx = NULL;
+    GOTO_IF((err = tq_mutex_create(&mtx)) != TQ_ERR_OK, cleanup);
+
+    *strand = calloc(1, sizeof(tq_strand));
+    GOTO_IF(!*strand && (err = TQ_ERR_OOM), cleanup);
+    (*strand)->runner = runner;
+    tq_queue_init(&(*strand)->queue);
+    tq_strand_task_init(&(*strand)->task, *strand);
+
+    MOVE_PTR((*strand)->mtx, mtx);
+cleanup:
+    CALL_ON_IF(mtx, tq_mutex_destroy);
+    return err;
+}
+
+void tq_strand_push(tq_strand *strand, tq_task *task)
+{
+    tq_mutex_lock(strand->mtx);
+    tq_queue_push(&strand->queue, task);
+    int is_empty = tq_queue_is_empty(&strand->queue);
+    tq_mutex_unlock(strand->mtx);
+
+    if (is_empty)
+        tq_runner_push(strand->runner, &strand->task.base);
+}
+
+void tq_strand_destroy(tq_strand *strand)
+{
+    CALL_ON_IF(strand->mtx, tq_mutex_destroy);
+    free(strand);
+}
+
+/* tq_strand_task function impl */
+
+static void tq_strand_task_init(tq_strand_task *task, tq_strand *strand)
+{
+    tq_task_init(&task->base, tq_strand_task_fn, NULL);
+    task->strand = strand;
+}
+
+static void tq_strand_task_fn(void *self)
+{
+    tq_strand_task *stt = self;
+    tq_mutex_lock(stt->strand->mtx);
+    tq_task *task = tq_queue_pop(&stt->strand->queue);
+    int is_empty = tq_queue_is_empty(&stt->strand->queue);
+    tq_mutex_unlock(stt->strand->mtx);
+
+    task->fn(task);
+    if (task->destroy)
+        task->destroy(task);
+
+    if (!is_empty)
+        tq_runner_push(stt->strand->runner, &stt->base);
 }
