@@ -1,5 +1,5 @@
-#ifndef TQ_TQ_H
-#define TQ_TQ_H
+#ifndef TQ_H
+#define TQ_H
 
 typedef enum tq_err
 {
@@ -112,4 +112,4 @@ void tq_strand_push(tq_strand *strand, tq_task *task);
  */
 void tq_strand_destroy(tq_strand *strand);
 
-#endif // TQ_TQ_H
+#endif // TQ_H
