@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <time.h>
 
 typedef struct sum_task
@@ -49,11 +50,11 @@ void *run(void *arg)
 
 int64_t timespecDiff(struct timespec *timeA_p, struct timespec *timeB_p)
 {
-  return ((timeA_p->tv_sec * 1000000000) + timeA_p->tv_nsec) -
+    return ((timeA_p->tv_sec * 1000000000) + timeA_p->tv_nsec) -
            ((timeB_p->tv_sec * 1000000000) + timeB_p->tv_nsec);
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     struct timespec tstart, tend;
     tq_runner *runner;
