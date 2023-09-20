@@ -63,9 +63,20 @@ int main(int argc, char **argv)
 
     size_t start = 0;
     size_t end = 100000000000;
-    const int num_tasks = 8;
+    
+    if (argc != 2)
+    {
+        printf("Usage: %s <num_tasks>\n", argv[0]);
+        return -1;
+    }
+    int num_tasks = atoi(argv[1]);
+    if (num_tasks > 100)
+    {
+        printf("num_tasks must be <= 100\n");
+        return -1;
+    }
 
-    size_t results[num_tasks] = {0};
+    size_t results[100] = {0};
     for (int i = 0; i < num_tasks; i++)
     {
         size_t range = (end - start) / num_tasks;
@@ -76,7 +87,7 @@ int main(int argc, char **argv)
     }
 
     clock_gettime(CLOCK_MONOTONIC, &tstart);
-    pthread_t thread[num_tasks];
+    pthread_t thread[100];
     for (int i = 0; i < num_tasks; i++)
         pthread_create(&thread[i], NULL, run, runner);
     for (int i = 0; i < num_tasks; i++)
