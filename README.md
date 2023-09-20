@@ -2,7 +2,9 @@
 
 #### Description
 
-Simple task queue implementation in C that allows to add tasks to a queue and execute in multiple threads.
+Simple task queue implementation in C that allows to add tasks to a queue and execute them from multiple threads.
+
+Right now, only Linux and Mac OS is supported.
 
 #### Example
 
