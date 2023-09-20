@@ -15,6 +15,11 @@ typedef enum tq_err
      * @note errno will be set if this error is returned.
      */
     TQ_ERR_OS = -2,
+
+    /** TQ_ERR_INVALID_ARG
+     * @brief An invalid argument was passed to a function
+     */
+    TQ_ERR_INVALID_ARG = -3,
 } tq_err;
 
 typedef struct tq_task
@@ -24,7 +29,7 @@ typedef struct tq_task
     struct tq_task *next;
 } tq_task;
 
-void tq_task_init(tq_task *task, void (*fn)(void *self), void (*destroy)(void *self));
+tq_err tq_task_init(tq_task *task, void (*fn)(void *self), void (*destroy)(void *self));
 
 /** tq_runner
  * @brief A runner manages a queue of tasks and executes them.

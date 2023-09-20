@@ -5,11 +5,14 @@
 
 /* tq_task init function */
 
-void tq_task_init(tq_task *task, void (*fn)(void *self), void (*destroy)(void *self))
+tq_err tq_task_init(tq_task *task, void (*fn)(void *self), void (*destroy)(void *self))
 {
+    if (!task || !fn)
+        return TQ_ERR_INVALID_ARG;
     task->fn = fn;
     task->destroy = destroy;
     task->next = NULL;
+    return TQ_ERR_OK;
 }
 
 /* tq_mutex */
