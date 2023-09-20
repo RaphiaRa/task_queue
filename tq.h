@@ -4,7 +4,16 @@
 typedef enum tq_err
 {
     TQ_ERR_OK = 0,
+
+    /** TQ_ERR_OOM
+     * @brief Out of memory
+     */
     TQ_ERR_OOM = -1,
+
+    /** TQ_ERR_OS
+     * @brief An error occured in the underlying OS API
+     * @note errno will be set if this error is returned.
+     */
     TQ_ERR_OS = -2,
 } tq_err;
 
