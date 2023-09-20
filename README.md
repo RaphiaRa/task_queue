@@ -1,10 +1,10 @@
-#### C Task Queue
+## C Task Queue
 
-## Description
+#### Description
 
 Simple task queue implementation in C that allows to add tasks to a queue and execute in multiple threads.
 
-## Example
+#### Example
 
 ```c
 #include "tq.h"
@@ -43,7 +43,7 @@ int main()
 
 ```
 
-## Parallel execution
+#### Parallel execution
 
 To execute tasks in parallel, simply call `tq_runner_run` in multiple threads.
 
