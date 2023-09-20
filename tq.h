@@ -22,13 +22,13 @@ typedef struct tq_runner tq_runner;
 typedef struct tq_strand tq_strand;
 
 tq_err tq_runner_create(tq_runner **runner);
-tq_err tq_runner_push(tq_runner *runner, tq_task *task);
+void tq_runner_push(tq_runner *runner, tq_task *task);
 tq_err tq_runner_run(tq_runner *runner);
 tq_err tq_runner_run_one(tq_runner *runner);
 void tq_runner_destroy(tq_runner *runner);
 
 tq_err tq_strand_create(tq_strand **strand, tq_runner *runner);
-tq_err tq_strand_push(tq_strand *strand, tq_task *task);
+void tq_strand_push(tq_strand *strand, tq_task *task);
 void tq_strand_destroy(tq_strand *strand);
 
 #endif // TQ_TQ_H

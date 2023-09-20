@@ -189,10 +189,16 @@ typedef struct tq_thread_data_storage
 
 /* tq_thread_data_storage functions */
 
+static void tq_thread_data_storage_on_key_destroy(void *data)
+{
+    if (data)
+        tq_thread_data_destroy(data);
+}
+
 static tq_err tq_thread_data_storage_create(tq_thread_data_storage **storage)
 {
     pthread_key_t key;
-    if (pthread_key_create(&key, NULL))
+    if (pthread_key_create(&key, tq_thread_data_storage_on_key_destroy))
         return TQ_ERR_OS;
 
     *storage = calloc(1, sizeof(tq_thread_data_storage));
@@ -202,16 +208,24 @@ static tq_err tq_thread_data_storage_create(tq_thread_data_storage **storage)
     return TQ_ERR_OK;
 }
 
-static tq_err tq_thread_data_storage_get(tq_thread_data_storage *storage, tq_thread_data **data)
+static tq_thread_data *tq_thread_data_storage_get(tq_thread_data_storage *storage)
+{
+    return pthread_getspecific(storage->key);
+}
+
+static tq_err tq_thread_data_storage_ensure_and_get(tq_thread_data_storage *storage, tq_thread_data **data)
 {
     tq_err err = TQ_ERR_OK;
-    *data = pthread_getspecific(storage->key);
+    *data = tq_thread_data_storage_get(storage);
     if (!*data)
     {
         if ((err = tq_thread_data_create(data)) != TQ_ERR_OK)
             return err;
         if (pthread_setspecific(storage->key, *data))
+        {
+            tq_thread_data_destroy(*data);
             return TQ_ERR_OS;
+        }
     }
     return TQ_ERR_OK;
 }
@@ -221,6 +235,8 @@ static void tq_thread_data_storage_destroy(tq_thread_data_storage *storage)
     pthread_key_delete(storage->key);
     free(storage);
 }
+
+/* tq_runer */
 
 struct tq_runner
 {
@@ -260,33 +276,45 @@ cleanup:
     return err;
 }
 
-tq_err tq_runner_push(tq_runner *runner, tq_task *task)
+static void tq_runner_push_to_thread_queue(tq_runner *runner, tq_task *task, tq_thread_data *thread_data)
 {
-    tq_mutex_lock(runner->mtx);
-    tq_queue_push(&runner->queue, task);
-    ++runner->tasks;
-    tq_cond_wake_one(runner->cond);
-    tq_mutex_unlock(runner->mtx);
-    return TQ_ERR_OK;
+    tq_queue_push(&thread_data->queue, task);
 }
 
-tq_err tq_runner_run(tq_runner *runner)
+void tq_runner_push(tq_runner *runner, tq_task *task)
 {
-    tq_mutex_lock(runner->mtx);
-    for (; runner->tasks; tq_mutex_lock(runner->mtx))
+    tq_thread_data *thread_data = tq_thread_data_storage_get(runner->storage);
+    if (thread_data)
     {
-        if (tq_runner_run_one(runner) != TQ_ERR_OK)
-            return TQ_ERR_OS;
+        tq_runner_push_to_thread_queue(runner, task, thread_data);
     }
-    tq_mutex_unlock(runner->mtx);
-    return TQ_ERR_OK;
+    else
+    {
+        tq_mutex_lock(runner->mtx);
+        tq_queue_push(&runner->queue, task);
+        ++runner->tasks;
+        tq_cond_wake_one(runner->cond);
+        tq_mutex_unlock(runner->mtx);
+    }
 }
 
-tq_err tq_runner_run_one(tq_runner *runner)
+static void tq_runner_cleanup_thread_queue(tq_runner *runer, tq_thread_data *thread_data)
 {
-    if (runner->tasks == 0)
-        return TQ_ERR_OK;
+    if (tq_queue_is_empty(&thread_data->queue))
+        return;
 
+    tq_mutex_lock(runer->mtx);
+    tq_task *task;
+    while ((task = tq_queue_pop(&thread_data->queue)))
+    {
+        tq_queue_push(&runer->queue, task);
+        ++runer->tasks;
+    }
+    tq_mutex_unlock(runer->mtx);
+}
+
+tq_err tq_runner_run_one_impl(tq_runner *runner, tq_thread_data *thread_data)
+{
     while (1)
     {
         if (!tq_queue_is_empty(&runner->queue))
@@ -296,6 +324,7 @@ tq_err tq_runner_run_one(tq_runner *runner)
             tq_mutex_unlock(runner->mtx);
             task->fn(task);
             task->destroy(task);
+            tq_runner_cleanup_thread_queue(runner, thread_data);
             return TQ_ERR_OK;
         }
         else
@@ -303,6 +332,36 @@ tq_err tq_runner_run_one(tq_runner *runner)
             tq_cond_wait(runner->cond, runner->mtx);
         }
     }
+}
+
+tq_err tq_runner_run(tq_runner *runner)
+{
+    tq_thread_data *thread_data = NULL;
+    tq_err err = tq_thread_data_storage_ensure_and_get(runner->storage, &thread_data);
+    if (err != TQ_ERR_OK)
+        return err;
+
+    tq_mutex_lock(runner->mtx);
+    for (; runner->tasks; tq_mutex_lock(runner->mtx))
+    {
+        if (tq_runner_run_one_impl(runner, thread_data) != TQ_ERR_OK)
+            return TQ_ERR_OS;
+    }
+    tq_mutex_unlock(runner->mtx);
+    return TQ_ERR_OK;
+}
+
+tq_err tq_runner_run_one(tq_runner *runner)
+{
+    tq_thread_data *thread_data = NULL;
+    tq_err err = tq_thread_data_storage_ensure_and_get(runner->storage, &thread_data);
+    if (err != TQ_ERR_OK)
+        return err;
+
+    tq_mutex_lock(runner->mtx);
+    if (runner->tasks == 0)
+        return TQ_ERR_OK;
+    return tq_runner_run_one_impl(runner, thread_data);
 }
 
 void tq_runner_destroy(tq_runner *runner)
