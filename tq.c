@@ -345,19 +345,6 @@ tq_err tq_runner_run(tq_runner *runner)
     return TQ_ERR_OK;
 }
 
-tq_err tq_runner_run_one(tq_runner *runner)
-{
-    tq_thread_data *thread_data = NULL;
-    tq_err err = tq_thread_data_storage_ensure_and_get(runner->storage, &thread_data);
-    if (err != TQ_ERR_OK)
-        return err;
-
-    tq_mutex_lock(runner->mtx);
-    if (runner->tasks == 0)
-        return TQ_ERR_OK;
-    return tq_runner_run_one_impl(runner, thread_data);
-}
-
 void tq_runner_destroy(tq_runner *runner)
 {
     if (runner->storage)
