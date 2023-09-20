@@ -3,28 +3,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-//
-#define FREE(ptr)   \
-    {               \
-        free(ptr);  \
-        ptr = NULL; \
-    }
-
-// move 'src' to 'dest' and set 'src' to NULL
-#define MOVE_PTR(dest, src) \
-    dest = src;             \
-    src = NULL
-
-// call 'fn' on 'value' if 'value' != 0
-#define CALL_ON_IF(value, fn) \
-    if (value)                \
-    fn(value)
-
-// goto 'label' if 'value' != 0
-#define GOTO_IF(value, label) \
-    if (value)                \
-    goto label
-
 /* tq_task init function */
 
 void tq_task_init(tq_task *task, void (*fn)(void *self), void (*destroy)(void *self))
@@ -43,15 +21,17 @@ typedef struct tq_mutex
 
 /* tq_mutex functions */
 
-static tq_err tq_mutex_create(tq_mutex **mutex)
+static tq_err tq_mutex_create(tq_mutex **out)
 {
-    if ((*mutex = calloc(1, sizeof(tq_mutex))) == NULL)
+    tq_mutex *mtx = NULL;
+    if ((mtx = calloc(1, sizeof(tq_mutex))) == NULL)
         return TQ_ERR_OOM;
-    if (pthread_mutex_init(&(*mutex)->mtx, NULL))
+    if (pthread_mutex_init(&mtx->mtx, NULL))
     {
-        FREE(*mutex);
+        free(mtx);
         return TQ_ERR_OS;
     }
+    *out = mtx;
     return TQ_ERR_OK;
 }
 
@@ -82,22 +62,24 @@ typedef struct tq_cond
 
 /* tq_cond functions */
 
-static tq_err tq_cond_create(tq_cond **cond)
+static tq_err tq_cond_create(tq_cond **out)
 {
-    if ((*cond = calloc(1, sizeof(tq_cond))) == NULL)
+    tq_cond *cond = NULL;
+    if ((cond = calloc(1, sizeof(tq_cond))) == NULL)
         return TQ_ERR_OOM;
-    if (pthread_cond_init(&(*cond)->cond, NULL))
+    if (pthread_cond_init(&cond->cond, NULL))
     {
-        FREE(*cond);
+        free(cond);
         return TQ_ERR_OS;
     }
+    *out = cond;
     return TQ_ERR_OK;
 }
 
 static void tq_cond_destroy(tq_cond *cond)
 {
     pthread_cond_destroy(&cond->cond);
-    FREE(cond);
+    free(cond);
 }
 
 static void tq_cond_wait(tq_cond *cond, tq_mutex *mtx)
@@ -166,12 +148,13 @@ typedef struct tq_thread_data
 
 /* tq_thread_data functions */
 
-static tq_err tq_thread_data_create(tq_thread_data **data)
+static tq_err tq_thread_data_create(tq_thread_data **out)
 {
-    *data = calloc(1, sizeof(tq_thread_data));
-    if (!*data)
+    tq_thread_data *data = calloc(1, sizeof(tq_thread_data));
+    if (!data)
         return TQ_ERR_OOM;
-    tq_queue_init(&(*data)->queue);
+    tq_queue_init(&data->queue);
+    *out = data;
     return TQ_ERR_OK;
 }
 
@@ -252,27 +235,37 @@ tq_err tq_runner_create(tq_runner **runner)
     tq_err err = TQ_ERR_OK;
 
     tq_thread_data_storage *storage = NULL;
-    GOTO_IF((err = tq_thread_data_storage_create(&storage)) != TQ_ERR_OK, cleanup);
+    if ((err = tq_thread_data_storage_create(&storage)) != TQ_ERR_OK)
+        goto cleanup;
 
     tq_mutex *mtx = NULL;
-    GOTO_IF((err = tq_mutex_create(&mtx)) != TQ_ERR_OK, cleanup);
+    if ((err = tq_mutex_create(&mtx)) != TQ_ERR_OK)
+        goto cleanup;
 
     tq_cond *cond = NULL;
-    GOTO_IF((err = tq_cond_create(&cond)) != TQ_ERR_OK, cleanup);
+    if ((err = tq_cond_create(&cond)) != TQ_ERR_OK)
+        goto cleanup;
 
     *runner = calloc(1, sizeof(tq_runner));
-    GOTO_IF(!*runner && (err = TQ_ERR_OOM), cleanup);
+    if (!*runner && (err = TQ_ERR_OOM))
+        goto cleanup;
     tq_queue_init(&(*runner)->queue);
     (*runner)->tasks = 0;
 
-    MOVE_PTR((*runner)->storage, storage);
-    MOVE_PTR((*runner)->mtx, mtx);
-    MOVE_PTR((*runner)->cond, cond);
+    (*runner)->storage = storage;
+    storage = NULL;
+    (*runner)->mtx = mtx;
+    mtx = NULL;
+    (*runner)->cond = cond;
+    cond = NULL;
 
 cleanup:
-    CALL_ON_IF(storage, tq_thread_data_storage_destroy);
-    CALL_ON_IF(mtx, tq_mutex_destroy);
-    CALL_ON_IF(cond, tq_cond_destroy);
+    if (storage)
+        tq_thread_data_storage_destroy(storage);
+    if (mtx)
+        tq_mutex_destroy(mtx);
+    if (cond)
+        tq_cond_destroy(cond);
     return err;
 }
 
@@ -367,9 +360,12 @@ tq_err tq_runner_run_one(tq_runner *runner)
 
 void tq_runner_destroy(tq_runner *runner)
 {
-    CALL_ON_IF(runner->storage, tq_thread_data_storage_destroy);
-    CALL_ON_IF(runner->mtx, tq_mutex_destroy);
-    CALL_ON_IF(runner->cond, tq_cond_destroy);
+    if (runner->storage)
+        tq_thread_data_storage_destroy(runner->storage);
+    if (runner->mtx)
+        tq_mutex_destroy(runner->mtx);
+    if (runner->cond)
+        tq_cond_destroy(runner->cond);
     free(runner);
 }
 
@@ -400,36 +396,41 @@ struct tq_strand
 tq_err tq_strand_create(tq_strand **strand, tq_runner *runner)
 {
     tq_err err = TQ_ERR_OK;
-
     tq_mutex *mtx = NULL;
-    GOTO_IF((err = tq_mutex_create(&mtx)) != TQ_ERR_OK, cleanup);
+    if ((err = tq_mutex_create(&mtx)) != TQ_ERR_OK)
+        goto cleanup;
 
     *strand = calloc(1, sizeof(tq_strand));
-    GOTO_IF(!*strand && (err = TQ_ERR_OOM), cleanup);
+    if (!*strand && (err = TQ_ERR_OOM))
+        goto cleanup;
+
     (*strand)->runner = runner;
     tq_queue_init(&(*strand)->queue);
     tq_strand_task_init(&(*strand)->task, *strand);
 
-    MOVE_PTR((*strand)->mtx, mtx);
+    (*strand)->mtx = mtx;
+    mtx = NULL;
 cleanup:
-    CALL_ON_IF(mtx, tq_mutex_destroy);
+    if (mtx)
+        tq_mutex_destroy(mtx);
     return err;
 }
 
 void tq_strand_push(tq_strand *strand, tq_task *task)
 {
     tq_mutex_lock(strand->mtx);
+    int was_empty = tq_queue_is_empty(&strand->queue);
     tq_queue_push(&strand->queue, task);
-    int is_empty = tq_queue_is_empty(&strand->queue);
     tq_mutex_unlock(strand->mtx);
 
-    if (is_empty)
+    if (was_empty)
         tq_runner_push(strand->runner, &strand->task.base);
 }
 
 void tq_strand_destroy(tq_strand *strand)
 {
-    CALL_ON_IF(strand->mtx, tq_mutex_destroy);
+    if (strand->mtx)
+        tq_mutex_destroy(strand->mtx);
     free(strand);
 }
 
