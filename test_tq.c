@@ -57,7 +57,7 @@ static void count_task_destroy(void* self)
     free(task);
 }
 
-static int test_tq_runner_create()
+static int test_tq_runner_create(void)
 {
     tq_runner* runner;
     TEST(tq_runner_create(&runner) == TQ_ERR_OK);
@@ -66,7 +66,7 @@ static int test_tq_runner_create()
     return 0;
 }
 
-static int test_tq_runner_push_count_task()
+static int test_tq_runner_push_count_task(void)
 {
     { // Push zero tasks
         tq_runner* runner;
@@ -101,7 +101,7 @@ static int test_tq_runner_push_count_task()
     return 0;
 }
 
-static int test_tq_runner_push_count_task_parallel()
+static int test_tq_runner_push_count_task_parallel(void)
 {
     { // Run zero tasks
         tq_runner* runner;
@@ -137,7 +137,7 @@ static int test_tq_runner_push_count_task_parallel()
     return 0;
 }
 
-static int test_tq_strand_create()
+static int test_tq_strand_create(void)
 {
     tq_strand* strand;
     tq_runner* runner;
@@ -149,7 +149,7 @@ static int test_tq_strand_create()
     return 0;
 }
 
-int test_tq_strand_push_count_task()
+int test_tq_strand_push_count_task(void)
 {
     { // Push zero tasks
         tq_strand* strand;
@@ -193,7 +193,7 @@ int test_tq_strand_push_count_task()
     return 0;
 }
 
-static int test_tq_strand_push_count_task_parallel()
+static int test_tq_strand_push_count_task_parallel(void)
 {
     { // Run zero tasks
         tq_strand* strand;
@@ -237,7 +237,7 @@ static int test_tq_strand_push_count_task_parallel()
     return 0;
 }
 
-int main()
+int main(void)
 {
     TEST(test_tq_runner_create() == 0);
     TEST(test_tq_runner_push_count_task() == 0);

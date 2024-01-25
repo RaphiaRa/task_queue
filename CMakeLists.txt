@@ -4,8 +4,10 @@ project(test_tq)
 set(CMAKE_C_STANDARD 99)
 
 # Extra warnings, treat warnings as error
-if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
-  add_compile_options(-Wall -Wextra -pedantic -Werror)
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" 
+    OR "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang"
+    OR "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
+  add_compile_options(-Wall -Wextra -pedantic -Werror -Wconversion)
 endif()
 
 add_library(tq 
