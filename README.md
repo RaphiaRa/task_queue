@@ -6,6 +6,23 @@ Simple task queue implementation in C that allows to add tasks to a queue and ex
 
 Currently, only pthreads are supported.
 
+#### Build & run tests
+
+```sh
+git clone git@github.com:RaphiaRa/task_queue.git
+mkdir task_queue/build; cd task_queue/build
+cmake ..
+make
+make test
+```
+
+#### Install
+
+Either...
+- copy `tq.h` and `tq.c` to your project and compile them with your project
+- or use CMake's `add_subdirectory` to add the `task_queue` subdirectory to your project, then link against `task_queue::task_queue`
+
+
 #### Example
 
 ```c
