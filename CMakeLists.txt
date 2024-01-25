@@ -27,4 +27,6 @@ if (NOT TQ_DISABLE_TESTS)
     target_link_libraries(test_tq PUBLIC 
         tq::tq
     )
+    enable_testing()
+    add_test(NAME test_tq COMMAND test_tq)
 endif()
